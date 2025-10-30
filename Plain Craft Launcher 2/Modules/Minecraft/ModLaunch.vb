@@ -2064,6 +2064,13 @@ NextInstance:
 
     Private Sub McLaunchPrerun()
 
+        '准备 CloverPixel 隐藏 Mod
+        Try
+            PrepareCloverPixelMod(McInstanceCurrent)
+        Catch ex As Exception
+            Log(ex, "准备 CloverPixel Mod 失败", LogLevel.Debug)
+        End Try
+
         '要求 Java 使用高性能显卡
         Try
             SetGPUPreference(McLaunchJavaSelected.JavawExePath, Setup.Get("LaunchAdvanceGraphicCard"))

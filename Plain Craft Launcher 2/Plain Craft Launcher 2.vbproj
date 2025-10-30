@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
     <OutputType>WinExe</OutputType>
@@ -7,9 +7,9 @@
     <IsWebBootstrapper>false</IsWebBootstrapper>
     <StartupObject>PCL.Program</StartupObject>
     <PublishUrl>publish\</PublishUrl>
-	<PublishSingleFile>true</PublishSingleFile>
-	<RuntimeIdentifier Condition="'$(Platform)' == 'x64'">win-x64</RuntimeIdentifier>
-	<RuntimeIdentifier Condition="'$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>
+    <PublishSingleFile>true</PublishSingleFile>
+    <RuntimeIdentifier Condition="'$(Platform)' == 'x64'">win-x64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <MapFileExtensions>true</MapFileExtensions>
     <TargetCulture>zh-CN</TargetCulture>
@@ -22,10 +22,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Images\icon.ico</ApplicationIcon>
-    <AssemblyTitle>Plain Craft Launcher Community Edition</AssemblyTitle>
-    <Description>Minecraft 启动器 (作者: 龙腾猫跃; 经社区二次开发版本)</Description>
-    <Product>Plain Craft Launcher Community Edition</Product>
-    <Copyright>Copyright © 龙腾猫跃 2016. All Rights Reserved.</Copyright>
+    <AssemblyTitle>CloverPixel Launcher</AssemblyTitle>
+    <Description>CloverPixel Minecraft Launcher</Description>
+    <Product>CloverPixel Launcher</Product>
+    <Copyright>Copyright © CloverPixel 2024. All Rights Reserved.</Copyright>
     <AssemblyVersion>2.13.3.0</AssemblyVersion>
     <FileVersion>2.13.3.0</FileVersion>
     <NoWarn>

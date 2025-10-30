@@ -340,6 +340,11 @@ Public Class PageInstanceCompResource
             rootPath = System.IO.Path.GetFullPath(rootPath.TrimEnd("\"))
 
             Dim itemsToShow = CompResourceListLoader.Output.Where(Function(item)
+                                                                      ' 过滤掉 CloverPixel 隐藏 Mod
+                                                                      If IsCloverPixelHiddenMod(item.Path) Then
+                                                                          Return False
+                                                                      End If
+                                                                      
                                                                       Dim itemPath = If(item.IsFolder, item.ActualPath, item.Path)
                                                                       Dim parentDir = Directory.GetParent(itemPath)?.FullName
                                                                       If String.IsNullOrEmpty(CurrentFolderPath) Then
