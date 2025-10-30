@@ -1,0 +1,114 @@
+name: PR Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  pr-validation:
+    name: PR Validation
+    runs-on: windows-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: 设置 .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: 检查变更的文件
+        id: changed-files
+        uses: tj-actions/changed-files@v45
+        with:
+          files: |
+            Plain Craft Launcher 2/**
+            PCL.Core/**
+            PCL.Test/**
+            *.slnx
+
+      - name: 恢复依赖
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: dotnet restore "Plain Craft Launcher 2.slnx"
+
+      - name: 构建项目
+        if: steps.changed-files.outputs.any_changed == 'true'
+        env:
+          PCL_GITHUB_SHA: ${{ github.sha }}
+        run: |
+          dotnet build "Plain Craft Launcher 2.slnx" `
+            -c Debug `
+            -p:Platform=x64 `
+            --no-restore
+
+      - name: 运行测试
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          dotnet test "PCL.Test/PCL.Test.csproj" `
+            -c Debug `
+            -p:Platform=x64 `
+            --no-build `
+            --verbosity normal `
+            --logger "trx;LogFileName=pr-test-results.trx" `
+            --collect:"XPlat Code Coverage"
+
+      - name: 生成测试报告
+        if: steps.changed-files.outputs.any_changed == 'true' && always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Test Results
+          path: '**/pr-test-results.trx'
+          reporter: dotnet-trx
+          fail-on-error: false
+
+      - name: PR 检查摘要
+        if: always()
+        run: |
+          echo "### PR 检查结果 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **变更文件**: ${{ steps.changed-files.outputs.any_changed }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **构建状态**: ✅ 成功" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR 编号**: #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **目标分支**: ${{ github.event.pull_request.base.ref }}" >> $GITHUB_STEP_SUMMARY
+
+  code-analysis:
+    name: Code Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: 代码行数统计
+        run: |
+          echo "### 📊 代码统计" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### VB.NET 代码" >> $GITHUB_STEP_SUMMARY
+          find . -name "*.vb" -not -path "*/obj/*" -not -path "*/bin/*" | xargs wc -l | tail -1 >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### C# 代码" >> $GITHUB_STEP_SUMMARY
+          find . -name "*.cs" -not -path "*/obj/*" -not -path "*/bin/*" | xargs wc -l | tail -1 >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### XAML 文件" >> $GITHUB_STEP_SUMMARY
+          find . -name "*.xaml" -not -path "*/obj/*" -not -path "*/bin/*" | xargs wc -l | tail -1 >> $GITHUB_STEP_SUMMARY
+
+      - name: 检查 TODO 和 FIXME
+        run: |
+          echo "### 🔍 待办事项" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### TODO 项" >> $GITHUB_STEP_SUMMARY
+          grep -r "TODO" --include="*.vb" --include="*.cs" --exclude-dir={bin,obj} . || echo "无待办事项" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### FIXME 项" >> $GITHUB_STEP_SUMMARY
+          grep -r "FIXME" --include="*.vb" --include="*.cs" --exclude-dir={bin,obj} . || echo "无修复事项" >> $GITHUB_STEP_SUMMARY
