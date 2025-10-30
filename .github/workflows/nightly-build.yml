@@ -1,0 +1,131 @@
+name: Nightly Build
+
+on:
+  schedule:
+    # 每天凌晨 2:00 UTC (北京时间 10:00) 运行
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  nightly-build:
+    name: Nightly Build - ${{ matrix.architecture }}
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        architecture: [x64, ARM64]
+      fail-fast: false
+
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: 获取版本信息
+        id: version
+        run: |
+          $date = Get-Date -Format "yyyy.MM.dd"
+          $commit = "${{ github.sha }}".Substring(0, 7)
+          $version = "$date-$commit"
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+          echo "date=$date" >> $env:GITHUB_OUTPUT
+
+      - name: 设置 .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: 恢复依赖
+        run: dotnet restore "Plain Craft Launcher 2.slnx"
+
+      - name: 构建 Release 版本
+        env:
+          PCL_WRITE_SECRET: '1'
+          PCL_MS_CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          PCL_CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+          PCL_TELEMETRY_KEY: ${{ secrets.TELEMETRY_KEY }}
+          PCL_NAID_CLIENT_ID: ${{ secrets.NAID_CLIENT_ID }}
+          PCL_NAID_CLIENT_SECRET: ${{ secrets.NAID_CLIENT_SECRET }}
+          PCL_LINK_SERVER_ROOT: ${{ secrets.LINK_SERVER_ROOTS }}
+          PCL_LOBBY_DEFAULT_SECRET: ${{ secrets.LOBBY_DEFAULT_SECRET }}
+          PCL_GITHUB_SHA: ${{ github.sha }}
+        run: |
+          dotnet publish "Plain Craft Launcher 2/Plain Craft Launcher 2.vbproj" `
+            -c Release `
+            -p:Platform=${{ matrix.architecture }} `
+            -p:PublishSingleFile=true `
+            -p:DeleteExistingFiles=true `
+            -o ./nightly/${{ matrix.architecture }} `
+            --self-contained false `
+            --no-restore
+
+      - name: 创建压缩包
+        run: |
+          $archiveName = "PCL2-CE-Nightly-${{ steps.version.outputs.version }}-${{ matrix.architecture }}.zip"
+          Compress-Archive -Path "./nightly/${{ matrix.architecture }}/*" -DestinationPath $archiveName
+
+      - name: 上传每日构建
+        uses: actions/upload-artifact@v4
+        with:
+          name: PCL2-CE-Nightly-${{ steps.version.outputs.date }}-${{ matrix.architecture }}
+          path: PCL2-CE-Nightly-*.zip
+          retention-days: 7
+
+      - name: 生成构建报告
+        if: always()
+        run: |
+          echo "### 🌙 每日构建报告" >> $env:GITHUB_STEP_SUMMARY
+          echo "" >> $env:GITHUB_STEP_SUMMARY
+          echo "- **版本**: ${{ steps.version.outputs.version }}" >> $env:GITHUB_STEP_SUMMARY
+          echo "- **架构**: ${{ matrix.architecture }}" >> $env:GITHUB_STEP_SUMMARY
+          echo "- **提交**: ${{ github.sha }}" >> $env:GITHUB_STEP_SUMMARY
+          echo "- **分支**: ${{ github.ref_name }}" >> $env:GITHUB_STEP_SUMMARY
+          echo "- **构建时间**: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" >> $env:GITHUB_STEP_SUMMARY
+
+  run-tests:
+    name: Nightly Tests
+    runs-on: windows-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: 设置 .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: 运行完整测试
+        run: |
+          dotnet test "PCL.Test/PCL.Test.csproj" `
+            -c Release `
+            -p:Platform=x64 `
+            --logger "trx;LogFileName=nightly-test-results.trx" `
+            --collect:"XPlat Code Coverage" `
+            --results-directory ./TestResults
+
+      - name: 上传测试结果
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-test-results
+          path: ./TestResults/**
+          retention-days: 7
+
+      - name: 测试报告
+        if: always()
+        run: |
+          echo "### 🧪 测试结果" >> $env:GITHUB_STEP_SUMMARY
+          echo "" >> $env:GITHUB_STEP_SUMMARY
+          echo "测试已完成，详细结果请查看产物。" >> $env:GITHUB_STEP_SUMMARY
