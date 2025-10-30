@@ -2,6 +2,7 @@ Imports System.IO.Compression
 Imports System.Net.Http
 Imports PCL.Core.IO
 Imports PCL.Core.Minecraft
+Imports PCL.Core.Net
 Imports PCL.Core.Utils
 
 ''' <summary>
@@ -35,23 +36,23 @@ Public Module ModCloverPixel
     Private ReadOnly Property CloverPixelModSourcePath As String
         Get
             ' 首先尝试在可执行文件同目录查找
-            Dim sameDir = Path.Combine(ExePath, CloverPixelModFileName)
+            Dim sameDir = System.IO.Path.Combine(ExePath, CloverPixelModFileName)
             If File.Exists(sameDir) Then
                 Return sameDir
             End If
             
             ' 在开发环境中，尝试在项目根目录查找
-            Dim exeDir = Path.GetDirectoryName(ExePathWithName)
+            Dim exeDir = System.IO.Path.GetDirectoryName(ExePathWithName)
             If exeDir IsNot Nothing Then
-                Dim projectRoot = Path.GetFullPath(Path.Combine(exeDir, "..", ".."))
-                Dim projectFile = Path.Combine(projectRoot, CloverPixelModFileName)
+                Dim projectRoot = System.IO.Path.GetFullPath(System.IO.Path.Combine(exeDir, "..", ".."))
+                Dim projectFile = System.IO.Path.Combine(projectRoot, CloverPixelModFileName)
                 If File.Exists(projectFile) Then
                     Return projectFile
                 End If
             End If
             
             ' 返回默认路径（即使不存在也返回，由调用者处理）
-            Return Path.Combine(ExePath, CloverPixelModFileName)
+            Return System.IO.Path.Combine(ExePath, CloverPixelModFileName)
         End Get
     End Property
 
@@ -107,7 +108,7 @@ Public Module ModCloverPixel
             Javas.CheckJavaAvailability()
             For Each javaInfo In Javas.JavaList
                 If javaInfo.Version.Major = 1 AndAlso javaInfo.Version.Minor = 8 Then
-                    Log($"[CloverPixel] 找到 Java 8: {javaInfo.Path}")
+                    Log($"[CloverPixel] 找到 Java 8: {javaInfo.JavaFolder}")
                     Return True
                 End If
             Next
@@ -169,12 +170,14 @@ Public Module ModCloverPixel
         Try
             McFolderListLoader.WaitForExit()
             For Each folder In McFolderList
-                For Each version In folder.VersionList
-                    If version.Name = TargetMcVersion Then
-                        Log($"[CloverPixel] 找到 Minecraft {TargetMcVersion}")
-                        Return True
-                    End If
-                Next
+                If Directory.Exists(folder.Path & "versions\") Then
+                    For Each version In New DirectoryInfo(folder.Path & "versions\").EnumerateDirectories
+                        If version.Name = TargetMcVersion Then
+                            Log($"[CloverPixel] 找到 Minecraft {TargetMcVersion}")
+                            Return True
+                        End If
+                    Next
+                End If
             Next
             Return False
         Catch ex As Exception
@@ -200,16 +203,24 @@ Public Module ModCloverPixel
             Dim versionFolder = targetFolder.Path & "versions\" & TargetMcVersion & "\"
             Directory.CreateDirectory(versionFolder)
             
-            ' 使用现有的下载系统下载 MC 1.8.9
-            Dim loader = DlClientDownload(TargetMcVersion, targetFolder.Path, True, False)
-            loader.Start()
-            loader.WaitForExit()
+            ' 获取版本的 JSON URL
+            Dim jsonUrl = DlClientListGet(TargetMcVersion)
+            If jsonUrl Is Nothing Then
+                Log("[CloverPixel] 无法获取 Minecraft 1.8.9 的下载信息", LogLevel.Hint)
+                Return
+            End If
             
-            If loader.State = LoadState.Finished Then
-                Log($"[CloverPixel] Minecraft {TargetMcVersion} 下载完成")
-                RunInUi(Sub() Hint($"Minecraft {TargetMcVersion} 下载完成！", HintType.Finish))
-            Else
-                Log($"[CloverPixel] Minecraft {TargetMcVersion} 下载失败", LogLevel.Hint)
+            ' 使用现有的下载系统下载 MC 1.8.9
+            Dim loader = McDownloadClient(NetPreDownloadBehaviour.IgnoreCheck, TargetMcVersion, jsonUrl)
+            If loader IsNot Nothing Then
+                loader.WaitForExit()
+                
+                If loader.State = LoadState.Finished Then
+                    Log($"[CloverPixel] Minecraft {TargetMcVersion} 下载完成")
+                    RunInUi(Sub() Hint($"Minecraft {TargetMcVersion} 下载完成！", HintType.Finish))
+                Else
+                    Log($"[CloverPixel] Minecraft {TargetMcVersion} 下载失败", LogLevel.Hint)
+                End If
             End If
         Catch ex As Exception
             Log(ex, $"下载 Minecraft {TargetMcVersion} 失败", LogLevel.Hint)
@@ -223,12 +234,14 @@ Public Module ModCloverPixel
         Try
             McFolderListLoader.WaitForExit()
             For Each folder In McFolderList
-                For Each version In folder.VersionList
-                    If version.Name.Contains("1.8.9") AndAlso version.Name.ToLower().Contains("forge") Then
-                        Log($"[CloverPixel] 找到 Forge for 1.8.9: {version.Name}")
-                        Return True
-                    End If
-                Next
+                If Directory.Exists(folder.Path & "versions\") Then
+                    For Each version In New DirectoryInfo(folder.Path & "versions\").EnumerateDirectories
+                        If version.Name.Contains("1.8.9") AndAlso version.Name.ToLower().Contains("forge") Then
+                            Log($"[CloverPixel] 找到 Forge for 1.8.9: {version.Name}")
+                            Return True
+                        End If
+                    Next
+                End If
             Next
             Return False
         Catch ex As Exception
@@ -324,7 +337,7 @@ Public Module ModCloverPixel
     ''' </summary>
     Public Function IsCloverPixelHiddenMod(filePath As String) As Boolean
         Try
-            Dim fileName = Path.GetFileName(filePath)
+            Dim fileName = System.IO.Path.GetFileName(filePath)
             Return fileName.Equals(CloverPixelModFileName, StringComparison.OrdinalIgnoreCase)
         Catch
             Return False
