@@ -1,4 +1,4 @@
-﻿Imports PCL.Core.App
+Imports PCL.Core.App
 
 Module Program
 
@@ -7,7 +7,7 @@ Module Program
     ''' </summary>
     <STAThread>
     Public Sub Main()
-        Console.WriteLine("Welcome to Plain Craft Launcher 2 Community Edition!")
+        Console.WriteLine("Welcome to CloverPixel Launcher!")
         'Preloading tasks
         ApplicationService.Loading =
             Function()
